@@ -15,7 +15,7 @@ A sleek, intuitive web-based user interface for the [Gemini CLI tool](https://gi
 ## Project Structure
 
 ```
-gemini-desk/
+gemini-cli-ui/
 ├── frontend/          # React + TypeScript frontend with Vite
 ├── backend/           # Node.js + Express backend with SQLite
 ├── package.json      # Root package.json with workspaces
@@ -33,7 +33,7 @@ gemini-desk/
 1. **Clone and install dependencies:**
 ```bash
 git clone <repository-url>
-cd gemini-desk
+cd gemini-cli-ui
 npm install
 ```
 
@@ -224,7 +224,7 @@ npm start
 ### Project Structure Details
 
 ```
-gemini-desk/
+gemini-cli-ui/
 ├── frontend/
 │   ├── src/
 │   │   ├── components/     # React components
