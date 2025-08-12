@@ -10,11 +10,9 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     project_id TEXT,
-    gemini_session_id TEXT UNIQUE,
     user_id TEXT,
     context_files TEXT,
     working_directory TEXT NOT NULL,
-    gemini_config TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
@@ -46,8 +44,6 @@ CREATE TABLE IF NOT EXISTS code_blocks (
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_project_id ON chat_sessions(project_id);
 
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_id ON chat_sessions(user_id);
-
-CREATE INDEX IF NOT EXISTS idx_chat_sessions_gemini_session_id ON chat_sessions(gemini_session_id);
 
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated_at ON chat_sessions(updated_at DESC);
 

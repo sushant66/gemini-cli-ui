@@ -22,7 +22,7 @@ export class Database {
   }
 
   /**
-   * Initialize database connection and run migrations
+   * Initialize database connection and create tables
    */
   async initialize(): Promise<void> {
     try {
@@ -33,8 +33,8 @@ export class Database {
       // Create database connection
       await this.connect();
 
-      // Run migrations
-      await this.runMigrations();
+      // Create tables and indexes (will be skipped if they already exist)
+      await this.createSchema();
 
       console.log('Database initialized successfully');
     } catch (error) {
@@ -71,85 +71,20 @@ export class Database {
   }
 
   /**
-   * Run database migrations
+   * Create database schema (tables, indexes, triggers)
    */
-  private async runMigrations(): Promise<void> {
+  private async createSchema(): Promise<void> {
     try {
-      // Define schema statements directly to avoid parsing issues
-      const statements = [
-        `CREATE TABLE IF NOT EXISTS users (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          email TEXT UNIQUE,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )`,
+      // Read schema from SQL file
+      const schemaPath = path.join(__dirname, 'schema.sql');
+      const schemaSQL = await fs.readFile(schemaPath, 'utf-8');
 
-        `CREATE TABLE IF NOT EXISTS chat_sessions (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          project_id TEXT,
-          user_id TEXT,
-          context_files TEXT,
-          working_directory TEXT NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-        )`,
+      // Execute the entire SQL file using sqlite3's exec method
+      await this.exec(schemaSQL);
 
-        `CREATE TABLE IF NOT EXISTS messages (
-          id TEXT PRIMARY KEY,
-          session_id TEXT NOT NULL,
-          type TEXT NOT NULL CHECK (type IN ('user', 'assistant', 'system')),
-          content TEXT NOT NULL,
-          timestamp DATETIME NOT NULL,
-          metadata TEXT,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
-        )`,
-
-        `CREATE TABLE IF NOT EXISTS code_blocks (
-          id TEXT PRIMARY KEY,
-          message_id TEXT NOT NULL,
-          language TEXT NOT NULL,
-          content TEXT NOT NULL,
-          filename TEXT,
-          start_line INTEGER,
-          end_line INTEGER,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE
-        )`,
-
-        'CREATE INDEX IF NOT EXISTS idx_chat_sessions_project_id ON chat_sessions(project_id)',
-        'CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_id ON chat_sessions(user_id)',
-        'CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated_at ON chat_sessions(updated_at DESC)',
-        'CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id)',
-        'CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp)',
-        'CREATE INDEX IF NOT EXISTS idx_code_blocks_message_id ON code_blocks(message_id)',
-
-        `CREATE TRIGGER IF NOT EXISTS update_users_updated_at
-          AFTER UPDATE ON users
-          FOR EACH ROW
-        BEGIN
-          UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
-        END`,
-
-        `CREATE TRIGGER IF NOT EXISTS update_chat_sessions_updated_at
-          AFTER UPDATE ON chat_sessions
-          FOR EACH ROW
-        BEGIN
-          UPDATE chat_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
-        END`,
-      ];
-
-      // Execute each statement
-      for (const statement of statements) {
-        await this.run(statement);
-      }
-
-      console.log('Database migrations completed');
+      console.log('Database schema created');
     } catch (error) {
-      console.error('Failed to run migrations:', error);
+      console.error('Failed to create schema:', error);
       throw error;
     }
   }
@@ -168,6 +103,25 @@ export class Database {
           reject(err);
         } else {
           resolve(this);
+        }
+      });
+    });
+  }
+
+  /**
+   * Execute multiple SQL statements from a string
+   */
+  async exec(sql: string): Promise<void> {
+    if (!this.db) {
+      throw new Error('Database not connected');
+    }
+
+    return new Promise((resolve, reject) => {
+      this.db!.exec(sql, (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
         }
       });
     });
