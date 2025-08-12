@@ -3,7 +3,6 @@ import {
   Plus,
   MessageSquare,
   FolderOpen,
-  Sparkles,
   Menu,
   X,
   Trash2,

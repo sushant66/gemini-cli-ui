@@ -48,7 +48,6 @@ export interface ChatSession {
   id: string;
   name: string;
   projectId?: string;
-  geminiSessionId?: string; // Maps to Gemini CLI session
   messages: ChatMessage[];
   context: {
     files: string[];
@@ -57,14 +56,6 @@ export interface ChatSession {
   };
   createdAt: Date;
   updatedAt: Date;
-}
-
-export interface GeminiCLISessionLog {
-  sessionId: string;
-  messageId: number;
-  type: 'user' | 'assistant';
-  message: string;
-  timestamp: string;
 }
 
 export interface Project {
@@ -82,11 +73,4 @@ export interface SessionValidationError {
   field: string;
   message: string;
   value?: any;
-}
-
-export interface SessionImportResult {
-  success: boolean;
-  session?: ChatSession;
-  errors?: SessionValidationError[];
-  warnings?: string[];
 }

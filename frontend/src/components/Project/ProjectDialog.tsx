@@ -109,11 +109,74 @@ const ProjectDialog: React.FC<ProjectDialogProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleBrowseDirectory = () => {
-    // In a real implementation, this would open a native directory picker
-    // For now, we'll just focus on the input field
-    const input = document.getElementById(mode === 'create' ? 'create-path' : 'open-path');
-    input?.focus();
+  const handleBrowseDirectory = async () => {
+    // Check if we're in an Electron environment or have access to the File System Access API
+    if ('showDirectoryPicker' in window) {
+      try {
+        // Use the modern File System Access API (Chrome 86+)
+        const dirHandle = await (window as any).showDirectoryPicker();
+        const directoryName = dirHandle.name;
+        
+        // Get the current platform to provide better examples
+        const platform = navigator.platform.toLowerCase();
+        const isWindows = platform.includes('win');
+        const isMac = platform.includes('mac');
+        
+        let examplePath = '';
+        if (isWindows) {
+          examplePath = `C:\\Users\\${navigator.userAgent.includes('Windows') ? 'username' : 'your-username'}\\projects\\${directoryName}`;
+        } else if (isMac) {
+          examplePath = `/Users/${navigator.userAgent.includes('Mac') ? 'username' : 'your-username'}/projects/${directoryName}`;
+        } else {
+          examplePath = `/home/username/projects/${directoryName}`;
+        }
+        
+        // Show a helpful dialog explaining the limitation
+        const userPath = prompt(
+          `✅ Selected directory: "${directoryName}"\n\n` +
+          `⚠️  Browser Security Limitation:\n` +
+          `For security reasons, browsers don't provide the full directory path.\n\n` +
+          `📝 Please enter the complete path to "${directoryName}":\n\n` +
+          `💡 Example for your system:\n${examplePath}\n\n` +
+          `🔍 Tip: You can copy the path from your file manager's address bar.`,
+          examplePath
+        );
+        
+        if (userPath && userPath.trim()) {
+          if (mode === 'create') {
+            setCreateForm(prev => ({
+              ...prev,
+              path: userPath.trim(),
+              name: prev.name || directoryName
+            }));
+          } else {
+            setOpenForm(prev => ({
+              ...prev,
+              path: userPath.trim(),
+              name: prev.name || directoryName
+            }));
+          }
+        }
+      } catch (error) {
+        // User cancelled or error occurred
+        console.log('Directory selection cancelled or failed:', error);
+      }
+    } else {
+      // Fallback: Show an alert with instructions
+      alert(
+        '🚫 Directory Browser Not Available\n\n' +
+        'Your browser doesn\'t support directory browsing.\n\n' +
+        '📝 Please manually enter the full path to your project directory:\n\n' +
+        '💡 Examples:\n' +
+        '• macOS/Linux: /Users/username/projects/my-project\n' +
+        '• Windows: C:\\Users\\username\\projects\\my-project\n\n' +
+        '🔍 Tip: Copy the path from your file manager\'s address bar.'
+      );
+      
+      // Focus the input field
+      const input = document.getElementById(mode === 'create' ? 'create-path' : 'open-path');
+      input?.focus();
+    }
   };
 
   if (!isOpen) return null;
@@ -286,17 +349,22 @@ const ProjectDialog: React.FC<ProjectDialogProps> = ({ isOpen, onClose }) => {
                     value={createForm.path}
                     onChange={(e) => setCreateForm(prev => ({ ...prev, path: e.target.value }))}
                     className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="/path/to/project/directory"
+                    placeholder="e.g., /Users/username/projects/my-project"
                     required
                   />
                   <button
                     type="button"
                     onClick={handleBrowseDirectory}
                     className="px-3 py-2 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-md text-gray-300 transition-colors"
+                    title="Browse for directory (if supported by browser)"
                   >
                     Browse
                   </button>
                 </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Enter the full path where you want to create the project directory.<br/>
+                  <span className="text-gray-600">Note: Browse button helps select folder name, but you'll need to provide the full path.</span>
+                </p>
               </div>
 
               <div>
@@ -345,17 +413,22 @@ const ProjectDialog: React.FC<ProjectDialogProps> = ({ isOpen, onClose }) => {
                     value={openForm.path}
                     onChange={(e) => setOpenForm(prev => ({ ...prev, path: e.target.value }))}
                     className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="/path/to/existing/directory"
+                    placeholder="e.g., /Users/username/projects/existing-project"
                     required
                   />
                   <button
                     type="button"
                     onClick={handleBrowseDirectory}
                     className="px-3 py-2 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-md text-gray-300 transition-colors"
+                    title="Browse for directory (if supported by browser)"
                   >
                     Browse
                   </button>
                 </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Enter the full path to an existing project directory.<br/>
+                  <span className="text-gray-600">Note: Browse button helps select folder name, but you'll need to provide the full path.</span>
+                </p>
               </div>
 
               <div>

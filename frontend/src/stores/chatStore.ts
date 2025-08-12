@@ -8,9 +8,14 @@ interface ChatState {
   // State
   error: string | null;
   isSendingMessage: boolean;
+  isLoadingSessions: boolean;
   
   // Active chat sessions (for new chats)
   activeChatSessions: Map<string, { sessionId: string; messages: ChatMessage[] }>;
+  
+  // Persistent sessions from database
+  persistentSessions: any[];
+  currentSession: any | null;
   
   // Actions
   sendMessage: (message: string) => Promise<void>;
@@ -18,6 +23,14 @@ interface ChatState {
   closeActiveChatSession: (sessionId: string) => void;
   clearError: () => void;
   initializeDefaultChat: () => Promise<void>;
+  
+  // Persistent session actions
+  loadSessions: (projectId?: string) => Promise<void>;
+  loadSession: (sessionId: string) => Promise<void>;
+  createPersistentSession: (sessionData: any) => Promise<any>;
+  updateSession: (sessionId: string, updates: any) => Promise<void>;
+  deleteSession: (sessionId: string) => Promise<void>;
+  addMessageToSession: (sessionId: string, messageData: any) => Promise<void>;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -26,7 +39,10 @@ export const useChatStore = create<ChatState>()(
       // Initial state
       error: null,
       isSendingMessage: false,
+      isLoadingSessions: false,
       activeChatSessions: new Map(),
+      persistentSessions: [],
+      currentSession: null,
 
 
 
@@ -196,6 +212,158 @@ export const useChatStore = create<ChatState>()(
           console.log('Skipping session creation - session already exists');
         }
       },
+
+      // Load persistent sessions from database
+      loadSessions: async (projectId?: string) => {
+        set({ isLoadingSessions: true, error: null });
+        
+        try {
+          const response = await apiClient.getSessions(projectId);
+          
+          if (response.success) {
+            set({ 
+              persistentSessions: response.data,
+              isLoadingSessions: false 
+            });
+          } else {
+            throw new Error('Failed to load sessions');
+          }
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to load sessions',
+            isLoadingSessions: false 
+          });
+        }
+      },
+
+      // Load a specific session
+      loadSession: async (sessionId: string) => {
+        set({ error: null });
+        
+        try {
+          const response = await apiClient.getSession(sessionId);
+          
+          if (response.success) {
+            set({ currentSession: response.data });
+          } else {
+            throw new Error('Failed to load session');
+          }
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to load session'
+          });
+        }
+      },
+
+      // Create a new persistent session
+      createPersistentSession: async (sessionData: any) => {
+        set({ error: null });
+        
+        try {
+          const response = await apiClient.createSession(sessionData);
+          
+          if (response.success) {
+            // Add to persistent sessions list
+            const { persistentSessions } = get();
+            set({ 
+              persistentSessions: [response.data, ...persistentSessions],
+              currentSession: response.data
+            });
+            return response.data;
+          } else {
+            throw new Error('Failed to create session');
+          }
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to create session'
+          });
+          throw error;
+        }
+      },
+
+      // Update a session
+      updateSession: async (sessionId: string, updates: any) => {
+        set({ error: null });
+        
+        try {
+          const response = await apiClient.updateSession(sessionId, updates);
+          
+          if (response.success) {
+            // Update in persistent sessions list
+            const { persistentSessions, currentSession } = get();
+            const updatedSessions = persistentSessions.map(session => 
+              session.id === sessionId ? response.data : session
+            );
+            
+            set({ 
+              persistentSessions: updatedSessions,
+              currentSession: currentSession?.id === sessionId ? response.data : currentSession
+            });
+          } else {
+            throw new Error('Failed to update session');
+          }
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to update session'
+          });
+        }
+      },
+
+      // Delete a session
+      deleteSession: async (sessionId: string) => {
+        set({ error: null });
+        
+        try {
+          const response = await apiClient.deleteSession(sessionId);
+          
+          if (response.success) {
+            // Remove from persistent sessions list
+            const { persistentSessions, currentSession } = get();
+            const updatedSessions = persistentSessions.filter(session => session.id !== sessionId);
+            
+            set({ 
+              persistentSessions: updatedSessions,
+              currentSession: currentSession?.id === sessionId ? null : currentSession
+            });
+          } else {
+            throw new Error('Failed to delete session');
+          }
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to delete session'
+          });
+        }
+      },
+
+      // Add a message to a persistent session
+      addMessageToSession: async (sessionId: string, messageData: any) => {
+        set({ error: null });
+        
+        try {
+          const response = await apiClient.addMessageToSession(sessionId, messageData);
+          
+          if (response.success) {
+            // Update current session if it matches
+            const { currentSession } = get();
+            if (currentSession?.id === sessionId) {
+              const updatedSession = {
+                ...currentSession,
+                messages: [...currentSession.messages, response.data],
+                updatedAt: new Date()
+              };
+              set({ currentSession: updatedSession });
+            }
+          } else {
+            throw new Error('Failed to add message');
+          }
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to add message'
+          });
+        }
+      },
+
+
     }),
     {
       name: 'chat-store',

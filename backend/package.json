@@ -7,6 +7,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "db:init": "tsx src/scripts/initDatabase.ts",
+    "db:reset": "rm -f data/gemini-desk.db && npm run db:init",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
     "lint": "eslint . --ext ts --report-unused-disable-directives --max-warnings 0",
@@ -15,30 +17,32 @@
     "format:check": "prettier --check \"src/**/*.{ts,js,json,md}\""
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "helmet": "^7.1.0",
-    "ws": "^8.14.2",
-    "uuid": "^9.0.1",
+    "@types/sqlite3": "^3.1.11",
     "chokidar": "^3.5.3",
-    "dotenv": "^16.3.1"
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "helmet": "^7.1.0",
+    "sqlite3": "^5.1.7",
+    "uuid": "^9.0.1",
+    "ws": "^8.14.2"
   },
   "devDependencies": {
-    "@types/express": "^4.17.21",
     "@types/cors": "^2.8.17",
-    "@types/ws": "^8.5.10",
-    "@types/uuid": "^9.0.7",
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.8",
     "@types/node": "^20.9.0",
+    "@types/supertest": "^2.0.16",
+    "@types/uuid": "^9.0.7",
+    "@types/ws": "^8.5.10",
     "@typescript-eslint/eslint-plugin": "^6.10.0",
     "@typescript-eslint/parser": "^6.10.0",
     "eslint": "^8.53.0",
-    "typescript": "^5.2.2",
-    "tsx": "^4.1.4",
-    "prettier": "^3.1.0",
     "jest": "^29.7.0",
-    "@types/jest": "^29.5.8",
-    "ts-jest": "^29.1.1",
+    "prettier": "^3.1.0",
     "supertest": "^6.3.3",
-    "@types/supertest": "^2.0.16"
+    "ts-jest": "^29.1.1",
+    "tsx": "^4.1.4",
+    "typescript": "^5.2.2"
   }
 }

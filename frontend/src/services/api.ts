@@ -98,7 +98,46 @@ class ApiClient {
 
 
 
-  // New Chat Session APIs
+  // Session Management APIs
+  async getSessions(projectId?: string): Promise<{ success: boolean; data: any[] }> {
+    const params = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+    return this.request(`/sessions${params}`);
+  }
+
+  async getSession(sessionId: string): Promise<{ success: boolean; data: any }> {
+    return this.request(`/sessions/${encodeURIComponent(sessionId)}`);
+  }
+
+  async createSession(sessionData: any): Promise<{ success: boolean; data: any }> {
+    return this.request('/sessions', {
+      method: 'POST',
+      body: JSON.stringify(sessionData),
+    });
+  }
+
+  async updateSession(sessionId: string, updates: any): Promise<{ success: boolean; data: any }> {
+    return this.request(`/sessions/${encodeURIComponent(sessionId)}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async deleteSession(sessionId: string): Promise<{ success: boolean; message: string }> {
+    return this.request(`/sessions/${encodeURIComponent(sessionId)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async addMessageToSession(sessionId: string, messageData: any): Promise<{ success: boolean; data: any }> {
+    return this.request(`/sessions/${encodeURIComponent(sessionId)}/messages`, {
+      method: 'POST',
+      body: JSON.stringify(messageData),
+    });
+  }
+
+
+
+  // New Chat Session APIs (CLI-based)
   async startNewChatSession(request: NewChatSessionRequest = {}): Promise<NewChatSessionResponse> {
     return this.request('/cli/chat/new', {
       method: 'POST',

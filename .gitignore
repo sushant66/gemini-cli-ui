@@ -101,3 +101,4 @@ Thumbs.db
 
 # Gemini Desk specific
 .gemini-desk/
+backend/data/gemini-desk.db

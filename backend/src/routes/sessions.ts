@@ -1,206 +1,199 @@
-import { Router, Request, Response } from 'express';
-import { sessionManager } from '../services/sessionManager';
+import express from 'express';
+import { sessionManager } from '../services/sessionManager.js';
+import { ChatSession, ChatMessage } from '../types/session.js';
 
-const router = Router();
+const router = express.Router();
 
-// Get all sessions
-router.get('/', async (req: Request, res: Response) => {
+/**
+ * GET /api/sessions
+ * List all chat sessions, optionally filtered by project
+ */
+router.get('/', async (req, res) => {
   try {
     const { projectId } = req.query;
-    const sessions = await sessionManager.listSessions(projectId as string);
-    res.json({ sessions });
+    const sessions = await sessionManager.listSessions(
+      projectId as string | undefined
+    );
+    
+    res.json({
+      success: true,
+      data: sessions
+    });
   } catch (error) {
     console.error('Failed to list sessions:', error);
     res.status(500).json({
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error',
+      success: false,
+      error: 'Failed to list sessions'
     });
   }
 });
 
-// Get a specific session
-router.get('/:id', async (req: Request, res: Response) => {
+/**
+ * GET /api/sessions/:id
+ * Get a specific chat session by ID
+ */
+router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const session = await sessionManager.getSession(id);
     
     if (!session) {
       return res.status(404).json({
-        error: 'Session not found',
-        message: `Session with ID ${id} does not exist`,
+        success: false,
+        error: 'Session not found'
       });
     }
-
-    res.json({ session });
+    
+    res.json({
+      success: true,
+      data: session
+    });
   } catch (error) {
     console.error('Failed to get session:', error);
     res.status(500).json({
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error',
+      success: false,
+      error: 'Failed to get session'
     });
   }
 });
 
-// Import a Gemini CLI session
-router.post('/import/:sessionId', async (req: Request, res: Response) => {
+/**
+ * POST /api/sessions
+ * Create a new chat session
+ */
+router.post('/', async (req, res) => {
   try {
-    const { sessionId } = req.params;
-    const result = await sessionManager.importGeminiCLISession(sessionId);
+    const sessionData = req.body as Omit<ChatSession, 'id' | 'createdAt' | 'updatedAt'>;
     
-    if (!result.success) {
+    // Validate required fields
+    if (!sessionData.name || !sessionData.context?.workingDirectory) {
       return res.status(400).json({
-        error: 'Import failed',
-        errors: result.errors,
+        success: false,
+        error: 'Missing required fields: name and context.workingDirectory'
       });
     }
-
+    
+    const session = await sessionManager.createSession(sessionData);
+    
     res.status(201).json({
       success: true,
-      session: result.session,
-      warnings: result.warnings,
+      data: session
     });
   } catch (error) {
-    console.error('Failed to import session:', error);
+    console.error('Failed to create session:', error);
     res.status(500).json({
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error',
+      success: false,
+      error: 'Failed to create session'
     });
   }
 });
 
-// Update a session
-router.put('/:id', async (req: Request, res: Response) => {
+/**
+ * PUT /api/sessions/:id
+ * Update a chat session
+ */
+router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
-
-    // Validate the session exists
-    const existingSession = await sessionManager.getSession(id);
-    if (!existingSession) {
-      return res.status(404).json({
-        error: 'Session not found',
-        message: `Session with ID ${id} does not exist`,
-      });
-    }
-
-    // Validate the updates
-    const validationErrors = sessionManager.validateSession({ ...existingSession, ...updates });
-    if (validationErrors.length > 0) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        errors: validationErrors,
-      });
-    }
-
+    const updates = req.body as Partial<ChatSession>;
+    
     await sessionManager.updateSession(id, updates);
+    
     const updatedSession = await sessionManager.getSession(id);
     
-    res.json({ session: updatedSession });
+    res.json({
+      success: true,
+      data: updatedSession
+    });
   } catch (error) {
     console.error('Failed to update session:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
-
-// Remove session from cache
-router.delete('/:id', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
     
-    // Validate the session exists
-    const existingSession = await sessionManager.getSession(id);
-    if (!existingSession) {
+    if (error instanceof Error && error.message.includes('not found')) {
       return res.status(404).json({
-        error: 'Session not found',
-        message: `Session with ID ${id} does not exist`,
+        success: false,
+        error: 'Session not found'
       });
     }
-
-    await sessionManager.removeFromCache(id);
-    res.json({ 
-      success: true,
-      message: `Session ${id} removed from cache`,
-    });
-  } catch (error) {
-    console.error('Failed to remove session from cache:', error);
+    
     res.status(500).json({
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error',
+      success: false,
+      error: 'Failed to update session'
     });
   }
 });
 
-
-
-// Sync with Gemini CLI sessions
-router.post('/sync', async (_req: Request, res: Response) => {
-  try {
-    await sessionManager.syncWithGeminiCLI();
-    res.json({
-      success: true,
-      message: 'Synchronization completed',
-    });
-  } catch (error) {
-    console.error('Failed to sync sessions:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
-
-// Get messages from a session (read-only)
-router.get('/:id/messages', async (req: Request, res: Response) => {
+/**
+ * DELETE /api/sessions/:id
+ * Delete a chat session
+ */
+router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const session = await sessionManager.getSession(id);
     
+    // Check if session exists
+    const session = await sessionManager.getSession(id);
     if (!session) {
       return res.status(404).json({
-        error: 'Session not found',
-        message: `Session with ID ${id} does not exist`,
+        success: false,
+        error: 'Session not found'
       });
     }
-
-    res.json({ messages: session.messages });
-  } catch (error) {
-    console.error('Failed to get messages:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
-
-// Get session validation status
-router.get('/:id/validate', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const session = await sessionManager.getSession(id);
     
-    if (!session) {
-      return res.status(404).json({
-        error: 'Session not found',
-        message: `Session with ID ${id} does not exist`,
-      });
-    }
-
-    const validationErrors = sessionManager.validateSession(session);
+    await sessionManager.removeSession(id);
     
     res.json({
-      valid: validationErrors.length === 0,
-      errors: validationErrors,
+      success: true,
+      message: 'Session deleted successfully'
     });
   } catch (error) {
-    console.error('Failed to validate session:', error);
+    console.error('Failed to delete session:', error);
     res.status(500).json({
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error',
+      success: false,
+      error: 'Failed to delete session'
     });
   }
 });
+
+/**
+ * POST /api/sessions/:id/messages
+ * Add a message to a chat session
+ */
+router.post('/:id/messages', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const messageData = req.body as Omit<ChatMessage, 'id'>;
+    
+    // Validate required fields
+    if (!messageData.type || !messageData.content || !messageData.timestamp) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: type, content, timestamp'
+      });
+    }
+    
+    const message = await sessionManager.addMessage(id, messageData);
+    
+    res.status(201).json({
+      success: true,
+      data: message
+    });
+  } catch (error) {
+    console.error('Failed to add message:', error);
+    
+    if (error instanceof Error && error.message.includes('not found')) {
+      return res.status(404).json({
+        success: false,
+        error: 'Session not found'
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'Failed to add message'
+    });
+  }
+});
+
+
 
 export { router as sessionsRouter };
