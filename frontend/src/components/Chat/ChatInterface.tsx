@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Sparkles, Copy, AlertCircle } from 'lucide-react';
 import { useChatStore } from '../../stores/chatStore';
+import { useProjectStore } from '../../stores/projectStore';
 import { CodeBlock } from '../../types/session';
 
 const ChatInterface: React.FC = () => {
@@ -14,6 +15,8 @@ const ChatInterface: React.FC = () => {
     clearError,
     initializeDefaultChat,
   } = useChatStore();
+
+  const { currentProject } = useProjectStore();
 
   // Initialize default chat on component mount
   useEffect(() => {
@@ -94,7 +97,25 @@ const ChatInterface: React.FC = () => {
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto">
-        {displayMessages.length === 0 ? (
+        {!currentProject ? (
+          <div className="flex h-full flex-col items-center justify-center px-4">
+            {/* No Project Selected */}
+            <div className="mb-8 text-center">
+              <div className="mb-4 flex items-center justify-center">
+                <Sparkles className="mr-2 h-6 w-6 text-orange-500" />
+                <h1 className="text-2xl font-normal text-white">
+                  Welcome to Gemini Desk
+                </h1>
+              </div>
+              <p className="text-lg text-gray-400 mb-4">
+                Please select a project to start chatting with Gemini.
+              </p>
+              <p className="text-sm text-gray-500">
+                Click "Select Project" in the sidebar to get started.
+              </p>
+            </div>
+          </div>
+        ) : displayMessages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center px-4">
             {/* Greeting */}
             <div className="mb-8 text-center">
@@ -188,11 +209,13 @@ const ChatInterface: React.FC = () => {
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyPress}
               placeholder={
-                currentSession 
+                !currentProject
+                  ? "Select a project to start chatting..."
+                  : currentSession 
                   ? "Message Gemini..." 
                   : "Start a new chat"
               }
-              disabled={!currentSession || isSendingMessage}
+              disabled={!currentProject || !currentSession || isSendingMessage}
               className="w-full resize-none rounded-xl border border-gray-600 bg-[#2a2a2a] px-4 py-3 pr-12 text-white placeholder-gray-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
               rows={1}
               style={{
@@ -208,7 +231,7 @@ const ChatInterface: React.FC = () => {
             />
             <button
               onClick={handleSendMessage}
-              disabled={!inputValue.trim() || !currentSession || isSendingMessage}
+              disabled={!inputValue.trim() || !currentProject || !currentSession || isSendingMessage}
               className="absolute bottom-2 right-2 rounded-lg bg-orange-500 p-2 transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-gray-600"
               aria-label="Send message"
             >
@@ -216,7 +239,9 @@ const ChatInterface: React.FC = () => {
             </button>
           </div>
           <div className="mt-2 text-center text-xs text-gray-500">
-            {currentSession
+            {!currentProject
+              ? "Select a project from the sidebar to enable chatting"
+              : currentSession
               ? "Gemini can make mistakes. Check important info."
               : "Click 'New Chat' in the sidebar to start a conversation"
             }

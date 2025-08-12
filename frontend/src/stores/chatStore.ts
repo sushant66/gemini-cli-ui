@@ -49,6 +49,13 @@ export const useChatStore = create<ChatState>()(
       // Send a message to the current session
       sendMessage: async (message: string) => {
         const { currentSession } = get();
+        const currentProject = useProjectStore.getState().currentProject;
+        
+        // Require project selection
+        if (!currentProject) {
+          set({ error: 'Please select a project before sending messages', isSendingMessage: false });
+          return;
+        }
         
         if (!currentSession) {
           set({ error: 'No active session', isSendingMessage: false });
@@ -68,13 +75,10 @@ export const useChatStore = create<ChatState>()(
           await get().addMessageToSession(currentSession.id, userMessage);
 
           try {
-            // Get current project for working directory
-            const currentProject = useProjectStore.getState().currentProject;
-            
-            // Send message to Gemini CLI
+            // Send message to Gemini CLI using project path
             const cliResponse = await apiClient.sendMessageToSession(`session-${currentSession.id}`, {
               message,
-              workingDirectory: currentProject?.path || currentSession.context.workingDirectory,
+              workingDirectory: currentProject.path,
             });
 
             // Create assistant message
@@ -120,14 +124,19 @@ export const useChatStore = create<ChatState>()(
         try {
           const currentProject = useProjectStore.getState().currentProject;
           
+          // Require project selection
+          if (!currentProject) {
+            throw new Error('Please select a project before creating a chat session');
+          }
+          
           // Create session data
           const sessionData = {
             name: `Chat ${new Date().toLocaleString()}`,
-            projectId: currentProject?.id,
+            projectId: currentProject.id,
             messages: [],
             context: {
               files: [],
-              workingDirectory: currentProject?.path || process.cwd(),
+              workingDirectory: currentProject.path,
             },
           };
 
@@ -161,11 +170,19 @@ export const useChatStore = create<ChatState>()(
       // Clear error state
       clearError: () => set({ error: null }),
 
-      // Initialize chat by loading existing sessions
+      // Initialize chat by loading existing sessions for current project
       initializeDefaultChat: async () => {
         try {
-          // Load existing sessions from database
-          await get().loadSessions();
+          const currentProject = useProjectStore.getState().currentProject;
+          
+          if (!currentProject) {
+            // Clear sessions if no project is selected
+            set({ persistentSessions: [], currentSession: null });
+            return;
+          }
+          
+          // Load existing sessions from database for current project
+          await get().loadSessions(currentProject.id);
           
           const { persistentSessions } = get();
           
@@ -175,7 +192,15 @@ export const useChatStore = create<ChatState>()(
             set({ currentSession: mostRecentSession });
             console.log('Loaded existing session:', mostRecentSession.id);
           } else {
-            console.log('No existing sessions found');
+            // No existing sessions - automatically create a new one
+            console.log('No existing sessions found for project, creating new session...');
+            try {
+              await get().createNewChatSession();
+              console.log('Automatically created new chat session');
+            } catch (error) {
+              console.error('Failed to auto-create chat session:', error);
+              set({ currentSession: null });
+            }
           }
         } catch (error) {
           console.error('Failed to initialize chat:', error);

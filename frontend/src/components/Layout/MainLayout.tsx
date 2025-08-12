@@ -38,6 +38,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     loadSession,
     deleteSession,
     loadSessions,
+    initializeDefaultChat,
   } = useChatStore();
 
   const {
@@ -50,8 +51,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   useEffect(() => {
     loadCurrentProject();
-    loadSessions(); // Load chat sessions on mount
-  }, [loadCurrentProject, loadSessions]);
+  }, [loadCurrentProject]);
+
+  // Initialize chat when current project changes
+  useEffect(() => {
+    initializeDefaultChat();
+  }, [currentProject, initializeDefaultChat]);
 
   const toggleSidebar = () => {
     setLayoutState((prev) => ({
@@ -64,7 +69,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   const handleNewChat = async () => {
     try {
-      // Always create a new chat session
+      if (!currentProject) {
+        // Open project dialog if no project is selected
+        openProjectDialog();
+        return;
+      }
+      
+      // Create a new chat session
       await createNewChatSession();
     } catch (error) {
       console.error('Failed to create new chat:', error);
@@ -105,10 +116,15 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             <div className="px-3 pb-3">
               <button 
                 onClick={handleNewChat}
-                className="flex w-full items-center space-x-2 rounded-md border border-gray-700 bg-transparent px-3 py-2 text-sm transition-colors hover:bg-gray-800"
+                className={clsx(
+                  "flex w-full items-center space-x-2 rounded-md border px-3 py-2 text-sm transition-colors",
+                  currentProject 
+                    ? "border-gray-700 bg-transparent hover:bg-gray-800 text-white" 
+                    : "border-orange-500 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400"
+                )}
               >
                 <Plus className="h-4 w-4" />
-                <span>New Chat</span>
+                <span>{currentProject ? "New Chat" : "Select Project"}</span>
               </button>
             </div>
 
