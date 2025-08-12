@@ -7,8 +7,6 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "db:init": "tsx src/scripts/initDatabase.ts",
-    "db:reset": "rm -f data/gemini-desk.db && npm run db:init",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
     "lint": "eslint . --ext ts --report-unused-disable-directives --max-warnings 0",
