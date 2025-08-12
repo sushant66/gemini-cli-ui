@@ -127,10 +127,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
             {/* Navigation Items */}
             <div className="space-y-1 px-3 pb-4">
-              <button className="flex w-full items-center space-x-3 rounded-md px-3 py-2 text-sm text-gray-300 transition-colors hover:bg-gray-800">
-                <MessageSquare className="h-4 w-4" />
-                <span>Chats</span>
-              </button>
               <button 
                 onClick={openProjectDialog}
                 className="flex w-full items-center space-x-3 rounded-md px-3 py-2 text-sm text-gray-300 transition-colors hover:bg-gray-800"
