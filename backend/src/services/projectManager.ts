@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
-import { Project, GeminiConfig } from '../types/session';
+import { Project } from '../types/session';
 
 export interface ProjectManagerOptions {
   projectsDir?: string;
@@ -12,7 +12,6 @@ export interface CreateProjectRequest {
   name: string;
   path: string;
   description?: string;
-  geminiConfig?: Partial<GeminiConfig>;
 }
 
 export interface ProjectValidationError {
@@ -68,7 +67,6 @@ export class ProjectManager {
       name: request.name,
       path: path.resolve(request.path),
       description: request.description,
-      geminiConfig: this.createDefaultGeminiConfig(request.geminiConfig),
       chatSessions: [],
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -370,22 +368,6 @@ export class ProjectManager {
    */
   private generateProjectId(): string {
     return `project-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  /**
-   * Create default Gemini configuration
-   */
-  private createDefaultGeminiConfig(partial?: Partial<GeminiConfig>): GeminiConfig {
-    return {
-      authMethod: 'google',
-      credentials: {},
-      model: 'gemini-pro',
-      temperature: 0.7,
-      maxTokens: 4096,
-      systemPrompt: undefined,
-      mcpServers: [],
-      ...partial,
-    };
   }
 
   /**

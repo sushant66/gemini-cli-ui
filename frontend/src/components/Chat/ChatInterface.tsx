@@ -9,7 +9,7 @@ const ChatInterface: React.FC = () => {
   const {
     error,
     isSendingMessage,
-    activeChatSessions,
+    currentSession,
     sendMessage,
     clearError,
     initializeDefaultChat,
@@ -69,18 +69,8 @@ const ChatInterface: React.FC = () => {
     }
   };
 
-  // Get messages from active chat session
-  const getDisplayMessages = () => {
-    // Get the first active chat session
-    const activeSessionId = Array.from(activeChatSessions.keys())[0];
-    if (activeSessionId) {
-      return activeChatSessions.get(activeSessionId)?.messages || [];
-    }
-    
-    return [];
-  };
-
-  const displayMessages = getDisplayMessages();
+  // Get messages from current session
+  const displayMessages = currentSession?.messages || [];
 
   return (
     <div className="flex h-full flex-col bg-[#1a1a1a]">
@@ -144,7 +134,7 @@ const ChatInterface: React.FC = () => {
                         {message.type === 'user' ? 'You' : 'Gemini'}
                       </span>
                       <span className="text-xs text-gray-500">
-                        {message.timestamp.toLocaleTimeString([], {
+                        {new Date(message.timestamp).toLocaleTimeString([], {
                           hour: '2-digit',
                           minute: '2-digit',
                         })}
@@ -198,11 +188,11 @@ const ChatInterface: React.FC = () => {
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyPress}
               placeholder={
-                activeChatSessions.size > 0 
+                currentSession 
                   ? "Message Gemini..." 
                   : "Start a new chat"
               }
-              disabled={activeChatSessions.size === 0 || isSendingMessage}
+              disabled={!currentSession || isSendingMessage}
               className="w-full resize-none rounded-xl border border-gray-600 bg-[#2a2a2a] px-4 py-3 pr-12 text-white placeholder-gray-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
               rows={1}
               style={{
@@ -218,7 +208,7 @@ const ChatInterface: React.FC = () => {
             />
             <button
               onClick={handleSendMessage}
-              disabled={!inputValue.trim() || activeChatSessions.size === 0 || isSendingMessage}
+              disabled={!inputValue.trim() || !currentSession || isSendingMessage}
               className="absolute bottom-2 right-2 rounded-lg bg-orange-500 p-2 transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-gray-600"
               aria-label="Send message"
             >
@@ -226,7 +216,7 @@ const ChatInterface: React.FC = () => {
             </button>
           </div>
           <div className="mt-2 text-center text-xs text-gray-500">
-            {activeChatSessions.size > 0
+            {currentSession
               ? "Gemini can make mistakes. Check important info."
               : "Click 'New Chat' in the sidebar to start a conversation"
             }

@@ -58,7 +58,7 @@ export class CLIExecutor extends EventEmitter {
   constructor(options: Partial<CLIExecutionOptions> = {}) {
     super();
     this.options = {
-      timeout: options.timeout || 30000, // 30 seconds default
+      timeout: options.timeout || 300000, // 5 minutes default
       maxOutputSize: options.maxOutputSize || 10 * 1024 * 1024, // 10MB default
       allowedCommands: options.allowedCommands || ['gemini'],
       geminiCliPath: options.geminiCliPath || 'gemini'

@@ -19,30 +19,7 @@ export interface CodeBlock {
   endLine?: number;
 }
 
-export interface GeminiConfig {
-  authMethod: 'google' | 'api-key' | 'vertex-ai';
-  credentials: {
-    apiKey?: string;
-    googleAccount?: string;
-    vertexProject?: string;
-  };
-  model: string;
-  temperature: number;
-  maxTokens: number;
-  systemPrompt?: string;
-  mcpServers: MCPServerConfig[];
-}
 
-export interface MCPServerConfig {
-  id: string;
-  name: string;
-  command: string;
-  args: string[];
-  env: Record<string, string>;
-  enabled: boolean;
-  status: 'running' | 'stopped' | 'error';
-  lastError?: string;
-}
 
 export interface ChatSession {
   id: string;
@@ -52,7 +29,6 @@ export interface ChatSession {
   context: {
     files: string[];
     workingDirectory: string;
-    geminiConfig: GeminiConfig;
   };
   createdAt: Date;
   updatedAt: Date;
@@ -63,7 +39,6 @@ export interface Project {
   name: string;
   path: string;
   description?: string;
-  geminiConfig: GeminiConfig;
   chatSessions: string[]; // Session IDs
   createdAt: Date;
   updatedAt: Date;

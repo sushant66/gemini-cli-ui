@@ -1,5 +1,5 @@
 import { database } from './database.js';
-import { ChatSession, ChatMessage, CodeBlock, GeminiConfig } from '../types/session.js';
+import { ChatSession, ChatMessage, CodeBlock } from '../types/session.js';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface DatabaseUser {
@@ -17,7 +17,6 @@ export interface DatabaseChatSession {
   user_id?: string;
   context_files: string; // JSON string
   working_directory: string;
-  gemini_config: string; // JSON string
   created_at: string;
   updated_at: string;
 }
@@ -68,8 +67,8 @@ export class DataAccessLayer {
     const sql = `
       INSERT INTO chat_sessions (
         id, name, project_id, user_id,
-        context_files, working_directory, gemini_config
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        context_files, working_directory
+      ) VALUES (?, ?, ?, ?, ?, ?)
     `;
     
     await database.run(sql, [
@@ -78,8 +77,7 @@ export class DataAccessLayer {
       session.projectId || null,
       null, // user_id - will be set when user management is implemented
       JSON.stringify(session.context.files),
-      session.context.workingDirectory,
-      JSON.stringify(session.context.geminiConfig)
+      session.context.workingDirectory
     ]);
   }
 
@@ -122,11 +120,6 @@ export class DataAccessLayer {
       if (updates.context.workingDirectory !== undefined) {
         fields.push('working_directory = ?');
         values.push(updates.context.workingDirectory);
-      }
-      
-      if (updates.context.geminiConfig !== undefined) {
-        fields.push('gemini_config = ?');
-        values.push(JSON.stringify(updates.context.geminiConfig));
       }
     }
 
@@ -191,7 +184,7 @@ export class DataAccessLayer {
         sessionId,
         message.type,
         message.content,
-        message.timestamp.toISOString(),
+        message.timestamp instanceof Date ? message.timestamp.toISOString() : new Date(message.timestamp).toISOString(),
         message.metadata ? JSON.stringify(message.metadata) : null
       ]);
 
@@ -312,8 +305,7 @@ export class DataAccessLayer {
       messages,
       context: {
         files: JSON.parse(dbSession.context_files),
-        workingDirectory: dbSession.working_directory,
-        geminiConfig: JSON.parse(dbSession.gemini_config) as GeminiConfig
+        workingDirectory: dbSession.working_directory
       },
       createdAt: new Date(dbSession.created_at),
       updatedAt: new Date(dbSession.updated_at)
@@ -334,7 +326,7 @@ export class DataAccessLayer {
       id: dbMessage.id,
       type: dbMessage.type,
       content: dbMessage.content,
-      timestamp: new Date(dbMessage.timestamp),
+      timestamp: new Date(dbMessage.timestamp), // Convert string back to Date
       metadata
     };
   }

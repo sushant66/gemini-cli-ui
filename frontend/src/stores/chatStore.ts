@@ -46,97 +46,62 @@ export const useChatStore = create<ChatState>()(
 
 
 
-      // Send a message to the active chat session
+      // Send a message to the current session
       sendMessage: async (message: string) => {
-        const { activeChatSessions } = get();
+        const { currentSession } = get();
         
+        if (!currentSession) {
+          set({ error: 'No active session', isSendingMessage: false });
+          return;
+        }
+
         set({ isSendingMessage: true, error: null });
 
         try {
-          // Add user message immediately for UI responsiveness
-          const userMessage: ChatMessage = {
-            id: `temp-${Date.now()}`,
-            type: 'user',
+          // Add user message to database and update UI
+          const userMessage = {
+            type: 'user' as const,
             content: message,
-            timestamp: new Date(),
+            timestamp: new Date().toISOString(), // Send as ISO string
           };
 
-          // Handle active chat session (new chat)
-          const activeSessionId = Array.from(activeChatSessions.keys())[0];
-          if (!activeSessionId) {
-            set({ error: 'No active session', isSendingMessage: false });
-            return;
-          }
-
-          const activeSession = activeChatSessions.get(activeSessionId)!;
-          const updatedMessages = [...activeSession.messages, userMessage];
-          
-          // Update active session with user message
-          const newActiveSessions = new Map(activeChatSessions);
-          newActiveSessions.set(activeSessionId, {
-            ...activeSession,
-            messages: updatedMessages,
-          });
-          set({ activeChatSessions: newActiveSessions });
+          await get().addMessageToSession(currentSession.id, userMessage);
 
           try {
             // Get current project for working directory
             const currentProject = useProjectStore.getState().currentProject;
             
-            // First, create a new Gemini CLI session (this is when we actually connect)
-            const newSessionResponse = await apiClient.startNewChatSession({
-              workingDirectory: currentProject?.path,
-            });
-
-            if (!newSessionResponse.success) {
-              throw new Error(newSessionResponse.error || 'Failed to create Gemini session');
-            }
-
-            // Now send the message to the newly created Gemini session
-            const cliResponse = await apiClient.sendMessageToSession(newSessionResponse.sessionId, {
+            // Send message to Gemini CLI
+            const cliResponse = await apiClient.sendMessageToSession(`session-${currentSession.id}`, {
               message,
-              workingDirectory: currentProject?.path,
+              workingDirectory: currentProject?.path || currentSession.context.workingDirectory,
             });
 
             // Create assistant message
-            const assistantMessage: ChatMessage = {
-              id: `response-${Date.now()}`,
-              type: 'assistant',
+            const assistantMessage = {
+              type: 'assistant' as const,
               content: cliResponse.success ? cliResponse.output : (cliResponse.error || 'Command failed'),
-              timestamp: new Date(),
+              timestamp: new Date().toISOString(), // Send as ISO string
               metadata: {
                 codeBlocks: cliResponse.success ? extractCodeBlocks(cliResponse.output) : undefined,
               },
             };
 
-            // Update with assistant response and replace the local session ID with the real Gemini session ID
-            const finalMessages = [...updatedMessages, assistantMessage];
-            
-            // Remove the old local session and add the new Gemini session
-            newActiveSessions.delete(activeSessionId);
-            newActiveSessions.set(newSessionResponse.sessionId, {
-              sessionId: newSessionResponse.sessionId,
-              messages: finalMessages,
-            });
+            // Add assistant message to database
+            await get().addMessageToSession(currentSession.id, assistantMessage);
 
-            set({ activeChatSessions: newActiveSessions, isSendingMessage: false });
+            set({ isSendingMessage: false });
           } catch (error) {
-            // If Gemini connection fails, show error but keep the local session
-            const errorMessage: ChatMessage = {
-              id: `error-${Date.now()}`,
-              type: 'assistant',
+            // If Gemini connection fails, add error message
+            const errorMessage = {
+              type: 'assistant' as const,
               content: `Failed to connect to Gemini: ${error instanceof Error ? error.message : 'Unknown error'}`,
-              timestamp: new Date(),
+              timestamp: new Date().toISOString(), // Send as ISO string
             };
 
-            const finalMessages = [...updatedMessages, errorMessage];
-            newActiveSessions.set(activeSessionId, {
-              ...activeSession,
-              messages: finalMessages,
-            });
+            await get().addMessageToSession(currentSession.id, errorMessage);
 
             set({ 
-              activeChatSessions: newActiveSessions, 
               isSendingMessage: false,
               error: 'Failed to connect to Gemini. Please check if the backend is running.'
             });
@@ -150,24 +115,32 @@ export const useChatStore = create<ChatState>()(
         }
       },
 
-      // Create a new chat session (local only, connects to Gemini on first message)
+      // Create a new chat session and save to database
       createNewChatSession: async (): Promise<string> => {
         try {
-          // Create a local session ID without connecting to Gemini
-          const sessionId = `chat-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+          const currentProject = useProjectStore.getState().currentProject;
           
-          // Clear existing sessions and create a new one
-          const newActiveSessions = new Map();
-          
-          // Create empty session (no initial messages)
-          newActiveSessions.set(sessionId, {
-            sessionId,
+          // Create session data
+          const sessionData = {
+            name: `Chat ${new Date().toLocaleString()}`,
+            projectId: currentProject?.id,
             messages: [],
-          });
+            context: {
+              files: [],
+              workingDirectory: currentProject?.path || process.cwd(),
+            },
+          };
 
-          set({ activeChatSessions: newActiveSessions });
+          // Create persistent session in database
+          const session = await get().createPersistentSession(sessionData);
+          
+          // Set as current session
+          set({ currentSession: session });
+          
+          // Clear active sessions (old approach)
+          set({ activeChatSessions: new Map() });
 
-          return sessionId;
+          return session.id;
         } catch (error) {
           set({ 
             error: error instanceof Error ? error.message : 'Failed to create new chat session'
@@ -188,28 +161,25 @@ export const useChatStore = create<ChatState>()(
       // Clear error state
       clearError: () => set({ error: null }),
 
-      // Initialize default chat session if none exists
+      // Initialize chat by loading existing sessions
       initializeDefaultChat: async () => {
-        const currentState = get();
-        
-        // Only create a new session if none exists
-        if (currentState.activeChatSessions.size === 0) {
-          console.log('Creating local chat session for UI...');
+        try {
+          // Load existing sessions from database
+          await get().loadSessions();
           
-          // Create a local session ID without connecting to Gemini
-          const sessionId = `chat-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+          const { persistentSessions } = get();
           
-          // Add to active sessions with empty messages
-          const newActiveSessions = new Map(currentState.activeChatSessions);
-          newActiveSessions.set(sessionId, {
-            sessionId,
-            messages: [],
-          });
-          
-          set({ activeChatSessions: newActiveSessions });
-          console.log('Local chat session created successfully');
-        } else {
-          console.log('Skipping session creation - session already exists');
+          // If there are existing sessions, set the most recent one as current
+          if (persistentSessions.length > 0) {
+            const mostRecentSession = persistentSessions[0]; // Already sorted by updatedAt DESC
+            set({ currentSession: mostRecentSession });
+            console.log('Loaded existing session:', mostRecentSession.id);
+          } else {
+            console.log('No existing sessions found');
+          }
+        } catch (error) {
+          console.error('Failed to initialize chat:', error);
+          set({ error: 'Failed to load chat sessions' });
         }
       },
 
@@ -221,8 +191,19 @@ export const useChatStore = create<ChatState>()(
           const response = await apiClient.getSessions(projectId);
           
           if (response.success) {
+            // Convert timestamp strings to Date objects
+            const sessions = response.data.map((session: any) => ({
+              ...session,
+              createdAt: new Date(session.createdAt),
+              updatedAt: new Date(session.updatedAt),
+              messages: session.messages.map((msg: any) => ({
+                ...msg,
+                timestamp: new Date(msg.timestamp)
+              }))
+            }));
+            
             set({ 
-              persistentSessions: response.data,
+              persistentSessions: sessions,
               isLoadingSessions: false 
             });
           } else {
@@ -244,7 +225,17 @@ export const useChatStore = create<ChatState>()(
           const response = await apiClient.getSession(sessionId);
           
           if (response.success) {
-            set({ currentSession: response.data });
+            // Convert timestamp strings to Date objects
+            const session = {
+              ...response.data,
+              createdAt: new Date(response.data.createdAt),
+              updatedAt: new Date(response.data.updatedAt),
+              messages: response.data.messages.map((msg: any) => ({
+                ...msg,
+                timestamp: new Date(msg.timestamp)
+              }))
+            };
+            set({ currentSession: session });
           } else {
             throw new Error('Failed to load session');
           }
@@ -263,13 +254,24 @@ export const useChatStore = create<ChatState>()(
           const response = await apiClient.createSession(sessionData);
           
           if (response.success) {
+            // Convert timestamp strings to Date objects
+            const session = {
+              ...response.data,
+              createdAt: new Date(response.data.createdAt),
+              updatedAt: new Date(response.data.updatedAt),
+              messages: response.data.messages.map((msg: any) => ({
+                ...msg,
+                timestamp: new Date(msg.timestamp)
+              }))
+            };
+            
             // Add to persistent sessions list
             const { persistentSessions } = get();
             set({ 
-              persistentSessions: [response.data, ...persistentSessions],
-              currentSession: response.data
+              persistentSessions: [session, ...persistentSessions],
+              currentSession: session
             });
-            return response.data;
+            return session;
           } else {
             throw new Error('Failed to create session');
           }
@@ -343,16 +345,8 @@ export const useChatStore = create<ChatState>()(
           const response = await apiClient.addMessageToSession(sessionId, messageData);
           
           if (response.success) {
-            // Update current session if it matches
-            const { currentSession } = get();
-            if (currentSession?.id === sessionId) {
-              const updatedSession = {
-                ...currentSession,
-                messages: [...currentSession.messages, response.data],
-                updatedAt: new Date()
-              };
-              set({ currentSession: updatedSession });
-            }
+            // Reload the current session to get the updated messages
+            await get().loadSession(sessionId);
           } else {
             throw new Error('Failed to add message');
           }

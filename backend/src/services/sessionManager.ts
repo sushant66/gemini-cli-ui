@@ -100,6 +100,7 @@ export class SessionManager {
     const newMessage: ChatMessage = {
       id: uuidv4(),
       ...message,
+      timestamp: message.timestamp instanceof Date ? message.timestamp : new Date(message.timestamp),
     };
 
     // Save message to database
