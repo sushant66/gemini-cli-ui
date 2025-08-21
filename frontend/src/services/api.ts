@@ -5,7 +5,7 @@ const getApiBaseUrl = () => {
   if (typeof window !== 'undefined' && (window as any).VITE_API_URL) {
     return (window as any).VITE_API_URL;
   }
-  return 'http://localhost:3001/api';
+  return '/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();
