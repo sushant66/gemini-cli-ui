@@ -82,12 +82,16 @@ export const useChatStore = create<ChatState>()(
             });
 
             // Create assistant message
+            const { content, codeBlocks } = cliResponse.success 
+              ? extractCodeBlocksAndCleanContent(cliResponse.output) 
+              : { content: cliResponse.error || 'Command failed', codeBlocks: undefined };
+              
             const assistantMessage = {
               type: 'assistant' as const,
-              content: cliResponse.success ? cliResponse.output : (cliResponse.error || 'Command failed'),
+              content,
               timestamp: new Date().toISOString(), // Send as ISO string
               metadata: {
-                codeBlocks: cliResponse.success ? extractCodeBlocks(cliResponse.output) : undefined,
+                codeBlocks,
               },
             };
 
@@ -390,11 +394,12 @@ export const useChatStore = create<ChatState>()(
   )
 );
 
-// Helper function to extract code blocks from text
-function extractCodeBlocks(text: string) {
+// Helper function to extract code blocks from text and clean content
+function extractCodeBlocksAndCleanContent(text: string) {
   const codeBlocks = [];
   const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
   let match;
+  let cleanedContent = text;
 
   while ((match = codeBlockRegex.exec(text)) !== null) {
     codeBlocks.push({
@@ -402,7 +407,19 @@ function extractCodeBlocks(text: string) {
       language: match[1] || 'text',
       content: match[2].trim(),
     });
+    
+    // Remove the code block from the main content
+    cleanedContent = cleanedContent.replace(match[0], '').trim();
   }
 
-  return codeBlocks;
+  return {
+    content: cleanedContent,
+    codeBlocks: codeBlocks.length > 0 ? codeBlocks : undefined
+  };
+}
+
+// Legacy helper function for backward compatibility
+function extractCodeBlocks(text: string) {
+  const result = extractCodeBlocksAndCleanContent(text);
+  return result.codeBlocks || [];
 }

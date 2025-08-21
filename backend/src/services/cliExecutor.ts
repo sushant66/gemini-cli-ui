@@ -95,7 +95,7 @@ export class CLIExecutor extends EventEmitter {
       
       return {
         success: result.exitCode === 0,
-        output: result.stdout,
+        output: this.filterOutput(result.stdout),
         error: result.stderr || undefined,
         executionTime,
         exitCode: result.exitCode
@@ -175,7 +175,7 @@ export class CLIExecutor extends EventEmitter {
       return {
         success: result.exitCode === 0,
         sessionId,
-        output: result.stdout,
+        output: this.filterOutput(result.stdout),
         error: result.stderr || undefined,
         executionTime
       };
@@ -396,6 +396,24 @@ export class CLIExecutor extends EventEmitter {
         }
       });
     });
+  }
+
+  /**
+   * Filter unwanted messages from CLI output
+   */
+  private filterOutput(output: string): string {
+    if (!output) return output;
+    
+    // Remove "Loaded cached credentials" line and similar status messages
+    const lines = output.split('\n');
+    const filteredLines = lines.filter(line => {
+      const trimmedLine = line.trim();
+      return !trimmedLine.startsWith('Loaded cached credentials') &&
+             !trimmedLine.startsWith('Loading') &&
+             trimmedLine !== '';
+    });
+    
+    return filteredLines.join('\n').trim();
   }
 
   /**
